@@ -1,15 +1,15 @@
 // ==UserScript==
-// @name         NAIrecord(v2.31)
+// @name         NAIrecord(v2.33)
 // @namespace    http://tampermonkey.net/
-// @version      2.31
+// @version      2.33
 // @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원) + 사이즈 정보 포함
 // @match        https://novelai.net/image*
 // @grant        GM_xmlhttpRequest
 // @connect      discord.com
-// @run-at       document-idle
+// @run-at       document-end
 // ==/UserScript==
 
-(function () {
+(function() {
   'use strict';
 
   const WEBHOOK_KEY = 'NAI_DISCORD_WEBHOOK_URL_v231';
@@ -159,22 +159,20 @@
       form.append('content', content);
       form.append('file', blob, 'image.png');
 
-      GM_xmlhttpRequest({
-        method: 'POST',
-        url: WEBHOOK_URL,
-        data: form,
-        onload: () => showAlert('✅ 디스코드 전송 완료!', 1200),
-        onerror: () => showAlert('❌ 디스코드 전송 실패...', 1200)
-      });
+      // 이미지 포함 전송에 fetch 사용
+      fetch(WEBHOOK_URL, { method: 'POST', body: form })
+        .then(() => showAlert('✅ 디스코드 전송 완료!', 1200))
+        .catch(() => showAlert('❌ 디스코드 전송 실패!', 1200));
+
     } else {
-      GM_xmlhttpRequest({
+      // 텍스트 전송에도 fetch 사용
+      fetch(WEBHOOK_URL, {
         method: 'POST',
-        url: WEBHOOK_URL,
         headers: { 'Content-Type': 'application/json' },
-        data: JSON.stringify({ content }),
-        onload: () => showAlert('✅ 텍스트 전송 완료!', 1200),
-        onerror: () => showAlert('❌ 전송 실패...', 1200)
-      });
+        body: JSON.stringify({ content })
+      })
+        .then(() => showAlert('✅ 텍스트 전송 완료!', 1200))
+        .catch(() => showAlert('❌ 전송 실패...', 1200));
     }
   }
 
@@ -204,7 +202,7 @@
       border: 'none', borderRadius: '8px', cursor: 'pointer',
       fontSize: '14px', boxShadow: '1px 1px 5px rgba(0,0,0,0.3)'
     });
-    btn.onclick = runSend;
+    btn.addEventListener('click', runSend);
 
     label.appendChild(checkbox);
     container.appendChild(label);
@@ -221,31 +219,15 @@
     }
   });
 
-  // 안내 팝업 (처음 실행 시 한 번만)
-  if (!localStorage.getItem('NAI_FIRST_TIME_HELP_SHOWN')) {
-    alert(
-      '📢 처음 설치하셨다면 꼭 확인해 주세요!\n\n' +
-      '📌 Tampermonkey에서 이 스크립트가 Discord 웹후크로 전송하려면 "Cross-origin 요청 허용" 권한이 필요합니다.\n\n' +
-      '▶ 경고창이 뜨면 **좌측 하단의 "도메인 항상 허용" 버튼**을 눌러주세요!'
-    );
-    localStorage.setItem('NAI_FIRST_TIME_HELP_SHOWN', '1');
-  }
-
-  createSendButton();
-})();
-// ==UserScript==
-// @name         New Userscript
-// @namespace    http://tampermonkey.net/
-// @version      2025-04-22
-// @description  try to take over the world!
-// @author       You
-// @match        http://*/*
-// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
-// @grant        none
-// ==/UserScript==
-
-(function() {
-    'use strict';
-
-    // Your code here...
+  window.addEventListener('load', () => {
+    if (!localStorage.getItem('NAI_FIRST_TIME_HELP_SHOWN')) {
+      alert(
+        '📢 처음 설치하셨다면 꼭 확인해 주세요!\n\n' +
+        '📌 Tampermonkey에서 이 스크립트가 Discord 웹후크로 전송하려면 "Cross-origin 요청 허용" 권한이 필요합니다.\n\n' +
+        '▶ 경고창이 뜨면 **좌측 하단의 "도메인 항상 허용" 버튼**을 눌러주세요!'
+      );
+      localStorage.setItem('NAI_FIRST_TIME_HELP_SHOWN', '1');
+    }
+    createSendButton();
+  });
 })();
