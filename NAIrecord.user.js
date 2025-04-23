@@ -1,18 +1,17 @@
 // ==UserScript==
-// @name         NAIrecord(v2.33)
+// @name         NAIrecord(v2.34)
 // @namespace    http://tampermonkey.net/
-// @version      2.33
-// @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원) + 사이즈 정보 포함
+// @version      2.34
+// @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원)
 // @match        https://novelai.net/image*
-// @grant        GM_xmlhttpRequest
-// @connect      discord.com
+// @grant        none
 // @run-at       document-end
 // ==/UserScript==
 
 (function() {
   'use strict';
 
-  const WEBHOOK_KEY = 'NAI_DISCORD_WEBHOOK_URL_v231';
+  const WEBHOOK_KEY = 'NAI_DISCORD_WEBHOOK_URL_v233';
 
   function getWebhook(forcePrompt = false) {
     let url = localStorage.getItem(WEBHOOK_KEY);
@@ -120,7 +119,7 @@
 
   async function runSend() {
     const WEBHOOK_URL = getWebhook();
-    if (!WEBHOOK_URL) return showAlert('❌ 유효한 웹후크를!! 입력해주세요!', 1500);
+    if (!WEBHOOK_URL) return showAlert('❌ 유효한 웹후크를 입력해주세요.', 1500);
     showAlert('✅ 저장·전송 중...', 800);
 
     const promptText = getPrompt(0);
@@ -146,23 +145,23 @@
 
     if (sendImage) {
       const imgEl = document.querySelector("img[src^='blob']");
-      if (!imgEl) return showAlert('⚠️ 이미지 없음!', 1200);
+      if (!imgEl) return showAlert('⚠️ 이미지 없음...', 1200);
 
       let blob;
       try {
         blob = await (await fetch(imgEl.src)).blob();
       } catch {
-        return showAlert('⚠️ 이미지 로드 실패!', 1200);
+        return showAlert('⚠️ 이미지 로드 실패...', 1200);
       }
 
       const form = new FormData();
       form.append('content', content);
       form.append('file', blob, 'image.png');
 
-      // 이미지 포함 전송에 fetch 사용
+      // 이미지 전송에 fetch 사용
       fetch(WEBHOOK_URL, { method: 'POST', body: form })
-        .then(() => showAlert('✅ 디스코드 전송 완료!', 1200))
-        .catch(() => showAlert('❌ 디스코드 전송 실패!', 1200));
+        .then(() => showAlert('✅ 전송 완료!', 1200))
+        .catch(() => showAlert('❌ 전송 실패...', 1200));
 
     } else {
       // 텍스트 전송에도 fetch 사용
@@ -223,7 +222,7 @@
     if (!localStorage.getItem('NAI_FIRST_TIME_HELP_SHOWN')) {
       alert(
         '📢 처음 설치하셨다면 꼭 확인해 주세요!\n\n' +
-        '📌 Tampermonkey에서 이 스크립트가 Discord 웹후크로 전송하려면 "Cross-origin 요청 허용" 권한이 필요합니다.\n\n' +
+        '📌 Tampermonkey에서 이 스크립트가 웹후크로 전송하려면 "Cross-origin 요청 허용" 권한이 필요합니다.\n\n' +
         '▶ 경고창이 뜨면 **좌측 하단의 "도메인 항상 허용" 버튼**을 눌러주세요!'
       );
       localStorage.setItem('NAI_FIRST_TIME_HELP_SHOWN', '1');
