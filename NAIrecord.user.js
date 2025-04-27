@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         NAIrecord(v2.34)
+// @name         NAIrecord(v2.35)
 // @namespace    http://tampermonkey.net/
-// @version      2.34
+// @version      2.35
 // @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원)
 // @match        https://novelai.net/image*
 // @grant        none
@@ -158,13 +158,11 @@
       form.append('content', content);
       form.append('file', blob, 'image.png');
 
-      // 이미지 전송에 fetch 사용
       fetch(WEBHOOK_URL, { method: 'POST', body: form })
         .then(() => showAlert('✅ 전송 완료!', 1200))
         .catch(() => showAlert('❌ 전송 실패...', 1200));
 
     } else {
-      // 텍스트 전송에도 fetch 사용
       fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,14 +207,20 @@
     document.body.appendChild(container);
   }
 
-  document.addEventListener('keydown', e => {
-    if (e.altKey && e.key.toLowerCase() === 'q') {
-      e.preventDefault(); runSend();
+  // 키보드 단축키 핸들링 (수정된 부분)
+  window.addEventListener('keydown', e => {
+    if (!e.altKey) return;
+    switch (e.code) {
+      case 'KeyQ':
+        e.preventDefault();
+        runSend();
+        break;
+      case 'KeyW':
+        e.preventDefault();
+        getWebhook(true);
+        break;
     }
-    if (e.altKey && e.key.toLowerCase() === 'w') {
-      e.preventDefault(); getWebhook(true);
-    }
-  });
+  }, true);
 
   window.addEventListener('load', () => {
     if (!localStorage.getItem('NAI_FIRST_TIME_HELP_SHOWN')) {
