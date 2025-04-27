@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         NAIrecord(v2.39)
+// @name         NAIrecord (v2.44)
 // @namespace    http://tampermonkey.net/
-// @version      2.39
-// @description  NovelAI 프롬프트 및 이미지 자동 전송 (VibeTransfer 완전 대응, 키보드 단축키 개선)
+// @version      2.44
+// @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원)
 // @match        https://novelai.net/image*
 // @grant        none
 // @run-at       document-end
@@ -27,9 +27,9 @@
     d.textContent = msg;
     Object.assign(d.style, {
       position: 'fixed', top: '20px', left: '50%',
-      transform: 'translateX(-50%)', background: '#333',
-      color: '#fff', padding: '8px 12px', borderRadius: '6px',
-      zIndex: 9999, fontSize: '14px', opacity: '0.9'
+      transform: 'translateX(-50%)',
+      background: '#333', color: '#fff', padding: '8px 12px',
+      borderRadius: '6px', zIndex: 9999, fontSize: '14px', opacity: '0.9'
     });
     document.body.appendChild(d);
     setTimeout(() => d.remove(), duration);
@@ -78,20 +78,28 @@
   }
 
   function getVibeTransfers() {
-    const blocks = Array.from(document.querySelectorAll('div.sc-bff03259-34.eOAcWr'));
+    const blocks = Array.from(document.querySelectorAll('div.sc-bff03259-35, div[class*="VibeTransfer"]'));
+    const seen = new Set();
     const lines = [];
 
-    blocks.forEach((block, idx) => {
-      const parent = block.closest('div.sc-bff03259-35.hmSJRu');
-      const idInput = parent?.querySelector('input[type="text"]');
-      const id = idInput?.value.trim() || `(No ID ${idx + 1})`;
+    blocks.forEach((block) => {
+      const nameInput = block.querySelector('input[type="text"]');
+      const numbers = block.querySelectorAll('input[type="number"]');
 
-      const nums = block.querySelectorAll('input[type="number"]');
-      const ref = nums[0]?.value.trim() || '(Unknown)';
-      const info = nums[1]?.value.trim() || '(Unknown)';
+      if (!nameInput || numbers.length < 2) return;
+
+      const name = nameInput.value.trim();
+      const ref = numbers[0].value.trim();
+      const info = numbers[1].value.trim();
+
+      const key = `${name}|${ref}|${info}`;
+      if (seen.has(key)) return;
+      seen.add(key);
 
       lines.push(
-        `Vibe Transfer ${idx + 1}: ${id}\nReference Strength: ${ref}\nInformation Extracted: ${info}`
+        `Vibe Transfer ${lines.length + 1}: ${name}\n` +
+        `Reference Strength: ${ref}\n` +
+        `Information Extracted: ${info}`
       );
     });
 
@@ -124,13 +132,11 @@
     const sampler = getSetting('Sampler');
     const sizeText = getImageSize();
 
-    const vibeText = vibeBlock ? vibeBlock + '\n\n' : 'Vibe Transfer: 없음\n\n';
-
     const content =
       `Prompt:\n${promptText}\n\n` +
       `Negative Prompt:\n${negText}\n\n` +
       (charBlock ? charBlock + '\n\n' : '') +
-      vibeText +
+      (vibeBlock ? vibeBlock + '\n\n' : 'Vibe Transfer: 없음\n\n') +
       (sizeText ? sizeText + '\n' : '') +
       `Steps: ${steps}\n` +
       `Prompt Guidance: ${guidance}\n` +
@@ -202,6 +208,7 @@
     document.body.appendChild(container);
   }
 
+  // 단축키 캡처링 단계 등록
   window.addEventListener('keydown', e => {
     if (!e.altKey) return;
     switch (e.code) {
