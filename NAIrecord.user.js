@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         NAIrecord(v2.35)
+// @name         NAIrecord(v2.39)
 // @namespace    http://tampermonkey.net/
-// @version      2.35
-// @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원)
+// @version      2.39
+// @description  NovelAI 프롬프트 및 이미지 자동 전송 (VibeTransfer 완전 대응, 키보드 단축키 개선)
 // @match        https://novelai.net/image*
 // @grant        none
 // @run-at       document-end
@@ -27,9 +27,9 @@
     d.textContent = msg;
     Object.assign(d.style, {
       position: 'fixed', top: '20px', left: '50%',
-      transform: 'translateX(-50%)',
-      background: '#333', color: '#fff', padding: '8px 12px',
-      borderRadius: '6px', zIndex: 9999, fontSize: '14px', opacity: '0.9'
+      transform: 'translateX(-50%)', background: '#333',
+      color: '#fff', padding: '8px 12px', borderRadius: '6px',
+      zIndex: 9999, fontSize: '14px', opacity: '0.9'
     });
     document.body.appendChild(d);
     setTimeout(() => d.remove(), duration);
@@ -78,27 +78,20 @@
   }
 
   function getVibeTransfers() {
-    const blocks = Array.from(document.querySelectorAll('.sc-7439d21c-35.kRA-DSY'));
-    const seen = new Set();
+    const blocks = Array.from(document.querySelectorAll('div.sc-bff03259-34.eOAcWr'));
     const lines = [];
 
-    blocks.forEach((block) => {
-      const idInput = block.querySelector('input.nalwB');
-      if (!idInput || !idInput.value.trim()) return;
+    blocks.forEach((block, idx) => {
+      const parent = block.closest('div.sc-bff03259-35.hmSJRu');
+      const idInput = parent?.querySelector('input[type="text"]');
+      const id = idInput?.value.trim() || `(No ID ${idx + 1})`;
 
-      const id = idInput.value.trim();
-      if (seen.has(id)) return;
-      seen.add(id);
-
-      const numberInputs = Array.from(block.querySelectorAll('input[type="number"]'));
-      const values = numberInputs.map(input => input.value);
-      const ref = values[0] || '';
-      const info = values[1] || '';
+      const nums = block.querySelectorAll('input[type="number"]');
+      const ref = nums[0]?.value.trim() || '(Unknown)';
+      const info = nums[1]?.value.trim() || '(Unknown)';
 
       lines.push(
-        `Vibe Transfer ${lines.length + 1} ID: ${id}\n` +
-        `Reference Strength: '${ref}'\n` +
-        `Information Extracted:  '${info}'`
+        `Vibe Transfer ${idx + 1}: ${id}\nReference Strength: ${ref}\nInformation Extracted: ${info}`
       );
     });
 
@@ -131,11 +124,13 @@
     const sampler = getSetting('Sampler');
     const sizeText = getImageSize();
 
+    const vibeText = vibeBlock ? vibeBlock + '\n\n' : 'Vibe Transfer: 없음\n\n';
+
     const content =
       `Prompt:\n${promptText}\n\n` +
       `Negative Prompt:\n${negText}\n\n` +
       (charBlock ? charBlock + '\n\n' : '') +
-      (vibeBlock ? vibeBlock + '\n\n' : '') +
+      vibeText +
       (sizeText ? sizeText + '\n' : '') +
       `Steps: ${steps}\n` +
       `Prompt Guidance: ${guidance}\n` +
@@ -207,7 +202,6 @@
     document.body.appendChild(container);
   }
 
-  // 키보드 단축키 핸들링 (수정된 부분)
   window.addEventListener('keydown', e => {
     if (!e.altKey) return;
     switch (e.code) {
