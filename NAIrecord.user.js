@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         NAIrecord (v2.44)
+// @name         NAIrecord(v2.46_E)
 // @namespace    http://tampermonkey.net/
-// @version      2.44
-// @description  NovelAI 프롬프트 및 이미지 자동 전송 (웹후크 지원)
+// @version      2.46
+// @description  NovelAI 프롬프트 및 이미지 자동 전송 (Embed 방식, 긴 프롬프트 지원)
 // @match        https://novelai.net/image*
 // @grant        none
 // @run-at       document-end
@@ -11,12 +11,12 @@
 (function() {
   'use strict';
 
-  const WEBHOOK_KEY = 'NAI_DISCORD_WEBHOOK_URL_v233';
+  const WEBHOOK_KEY = 'NAI_DISCORD_WEBHOOK_URL_v2.46';
 
   function getWebhook(forcePrompt = false) {
     let url = localStorage.getItem(WEBHOOK_KEY);
     if (!url || forcePrompt) {
-      url = prompt('📩 웹후크 주소를 입력하세요', 'https://discord.com/api/webhooks/...');
+      url = prompt('📩 웹후크 주소를 입력하세요', '[https://discord.com/api/webhooks/](https://discord.com/api/webhooks/)...');
       if (url) localStorage.setItem(WEBHOOK_KEY, url.trim());
     }
     return url;
@@ -78,31 +78,21 @@
   }
 
   function getVibeTransfers() {
-    const blocks = Array.from(document.querySelectorAll('div.sc-bff03259-35, div[class*="VibeTransfer"]'));
-    const seen = new Set();
+    const blocks = Array.from(document.querySelectorAll('.sc-bff03259-35'));
+    if (blocks.length === 0) return '';
     const lines = [];
-
-    blocks.forEach((block) => {
+    blocks.forEach((block, idx) => {
       const nameInput = block.querySelector('input[type="text"]');
-      const numbers = block.querySelectorAll('input[type="number"]');
-
-      if (!nameInput || numbers.length < 2) return;
-
-      const name = nameInput.value.trim();
-      const ref = numbers[0].value.trim();
-      const info = numbers[1].value.trim();
-
-      const key = `${name}|${ref}|${info}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-
+      const name = nameInput?.value?.trim() || `(No Name ${idx + 1})`;
+      const numberInputs = block.querySelectorAll('input[type="number"]');
+      const refStrength = numberInputs[0]?.value || '(Unknown)';
+      const infoExtracted = numberInputs[1]?.value || '(Unknown)';
       lines.push(
-        `Vibe Transfer ${lines.length + 1}: ${name}\n` +
-        `Reference Strength: ${ref}\n` +
-        `Information Extracted: ${info}`
+        `Vibe Transfer ${idx + 1}: ${name}\n` +
+        `Reference Strength: ${refStrength}\n` +
+        `Information Extracted: ${infoExtracted}`
       );
     });
-
     return lines.join('\n\n');
   }
 
@@ -118,6 +108,27 @@
     return '';
   }
 
+  function splitText(name, text, maxLength = 1024) {
+    if (!text || text.trim() === '') return [];
+
+    // ★ 수정된 부분: 코드블록 기호(8자)를 뺀 실제 최대 길이를 계산
+    const adjustedMaxLength = maxLength - 8;
+    const chunks = [];
+
+    for (let i = 0; i < text.length; i += adjustedMaxLength) {
+      chunks.push(text.substring(i, i + adjustedMaxLength));
+    }
+
+    if (chunks.length === 1) {
+      return [{ name, value: '```\n' + chunks[0] + '\n```', inline: false }];
+    }
+    return chunks.map((chunk, i) => ({
+      name: `${name} (${i + 1}/${chunks.length})`,
+      value: '```\n' + chunk + '\n```',
+      inline: false,
+    }));
+  }
+
   async function runSend() {
     const WEBHOOK_URL = getWebhook();
     if (!WEBHOOK_URL) return showAlert('❌ 유효한 웹후크를 입력해주세요.', 1500);
@@ -128,49 +139,62 @@
     const charBlock = getCharacterPrompts();
     const vibeBlock = getVibeTransfers();
     const steps = getSetting('Steps');
-    const guidance = getPromptGuidance(parseFloat(steps));
     const sampler = getSetting('Sampler');
+    const guidance = getPromptGuidance(parseFloat(steps));
     const sizeText = getImageSize();
 
-    const content =
-      `Prompt:\n${promptText}\n\n` +
-      `Negative Prompt:\n${negText}\n\n` +
-      (charBlock ? charBlock + '\n\n' : '') +
-      (vibeBlock ? vibeBlock + '\n\n' : 'Vibe Transfer: 없음\n\n') +
+    const charAndVibeText = ((charBlock ? charBlock + '\n\n' : '') + (vibeBlock || '')).trim();
+
+    const settingsText = (
       (sizeText ? sizeText + '\n' : '') +
       `Steps: ${steps}\n` +
-      `Prompt Guidance: ${guidance}\n` +
-      `Sampler: ${sampler}`;
+      `Sampler: ${sampler}\n` +
+      `Prompt Guidance: ${guidance}`
+    ).trim();
 
     const sendImage = document.getElementById('nai-image-toggle')?.checked;
+
+    const fields = [
+      ...splitText('Prompt', promptText),
+      ...splitText('Negative Prompt', negText),
+      ...splitText('Character Prompts', charAndVibeText),
+      ...splitText('Settings', settingsText),
+    ];
+
+    const embed = {
+      color: 5009087,
+      fields: fields,
+    };
 
     if (sendImage) {
       const imgEl = document.querySelector("img[src^='blob']");
       if (!imgEl) return showAlert('⚠️ 이미지 없음...', 1200);
 
-      let blob;
+      let imageBlob;
       try {
-        blob = await (await fetch(imgEl.src)).blob();
+        imageBlob = await (await fetch(imgEl.src)).blob();
       } catch {
         return showAlert('⚠️ 이미지 로드 실패...', 1200);
       }
 
-      const form = new FormData();
-      form.append('content', content);
-      form.append('file', blob, 'image.png');
+      embed.image = { url: 'attachment://image.png' };
 
-      fetch(WEBHOOK_URL, { method: 'POST', body: form })
-        .then(() => showAlert('✅ 전송 완료!', 1200))
-        .catch(() => showAlert('❌ 전송 실패...', 1200));
+      const formData = new FormData();
+      formData.append('payload_json', JSON.stringify({ embeds: [embed] }));
+      formData.append('file', imageBlob, 'image.png');
+
+      fetch(WEBHOOK_URL, { method: 'POST', body: formData })
+        .then(res => res.ok ? showAlert('✅ 전송 완료!', 1200) : showAlert(`❌ 전송 실패 (${res.status})`, 2000))
+        .catch(() => showAlert('❌ 네트워크 오류...', 1200));
 
     } else {
       fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ embeds: [embed] })
       })
-        .then(() => showAlert('✅ 텍스트 전송 완료!', 1200))
-        .catch(() => showAlert('❌ 전송 실패...', 1200));
+      .then(res => res.ok ? showAlert('✅ 텍스트 전송 완료!', 1200) : showAlert(`❌ 전송 실패 (${res.status})`, 2000))
+      .catch(() => showAlert('❌ 네트워크 오류...', 1200));
     }
   }
 
@@ -182,7 +206,6 @@
       position: 'fixed', bottom: '10px', right: '10px', zIndex: 9999,
       display: 'flex', alignItems: 'center', gap: '6px'
     });
-
     const label = document.createElement('label');
     label.innerHTML = '🖼️';
     label.style.fontSize = '16px';
@@ -208,7 +231,6 @@
     document.body.appendChild(container);
   }
 
-  // 단축키 캡처링 단계 등록
   window.addEventListener('keydown', e => {
     if (!e.altKey) return;
     switch (e.code) {
@@ -228,10 +250,11 @@
       alert(
         '📢 처음 설치하셨다면 꼭 확인해 주세요!\n\n' +
         '📌 Tampermonkey에서 이 스크립트가 웹후크로 전송하려면 "Cross-origin 요청 허용" 권한이 필요합니다.\n\n' +
-        '▶ 경고창이 뜨면 **좌측 하단의 "도메인 항상 허용" 버튼**을 눌러주세요!'
+        '▶ 경고창이 뜨면 좌측 하단의 "도메인 항상 허용" 버튼을 눌러주세요!'
       );
       localStorage.setItem('NAI_FIRST_TIME_HELP_SHOWN', '1');
     }
     createSendButton();
   });
+
 })();
