@@ -4,7 +4,7 @@ NovelAI 프롬프트를 기록하는 템퍼몽키 스크립트입니다.
 
 ---
 
-### [여기를 눌러 스크립트 설치하기](https://raw.githubusercontent.com/sep91/NAIrecord/main/NAIrecord.user.js)
+### [여기를 눌러 스크립트 설치하기](chrome-extension://dhdgffkkebhmkfjojejmpbldmpobfkfo/ask.html?aid=900a7b4e-fabc-49f5-be64-d8ec6a68733e)
 
 ---
 
