@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         NAIrecord(v2.46_E)
+// @name         NAIrecord(v2.47)
 // @namespace    http://tampermonkey.net/
-// @version      2.46
+// @version      2.47
 // @description  NovelAI 프롬프트 및 이미지 자동 전송 (Embed 방식, 긴 프롬프트 지원)
 // @match        https://novelai.net/image*
 // @grant        none
